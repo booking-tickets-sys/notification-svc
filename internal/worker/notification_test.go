@@ -6,7 +6,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"notification-svc/internal/models/events"
 )
@@ -25,7 +24,7 @@ func TestNotificationWorker_New(t *testing.T) {
 	assert.False(t, worker.IsRunning())
 }
 
-func TestOrderCreatedPayload_ToTask(t *testing.T) {
+func TestOrderCreatedPayload_Structure(t *testing.T) {
 	payload := events.OrderCreatedPayload{
 		EventMetadata: events.EventMetadata{
 			EventID:     "test-event-123",
@@ -37,8 +36,9 @@ func TestOrderCreatedPayload_ToTask(t *testing.T) {
 		TicketID: "ticket-789",
 	}
 
-	task, err := payload.ToTask()
-	require.NoError(t, err)
-	assert.NotNil(t, task)
-	assert.Equal(t, "order_created", task.Type())
+	assert.Equal(t, "test-event-123", payload.EventMetadata.EventID)
+	assert.Equal(t, "order_created", payload.EventMetadata.EventName)
+	assert.Equal(t, "order-123", payload.OrderID)
+	assert.Equal(t, "user-456", payload.UserID)
+	assert.Equal(t, "ticket-789", payload.TicketID)
 } 

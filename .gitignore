@@ -45,6 +45,7 @@ Thumbs.db
 notification-svc
 dist/
 build/
+bin/
 
 # Docker
 .dockerignore 

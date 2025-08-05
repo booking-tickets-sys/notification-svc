@@ -96,6 +96,34 @@ install-tools:
 	@echo "Installing development tools..."
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
+# Run security scan
+.PHONY: security
+security:
+	@echo "Running security scan..."
+	gosec ./...
+
+# Run all checks (lint, test, security)
+.PHONY: check
+check: lint test security
+
+# Build Docker image
+.PHONY: docker-build
+docker-build:
+	@echo "Building Docker image..."
+	docker build -t notification-svc:latest .
+
+# Run with Docker Compose
+.PHONY: docker-up
+docker-up:
+	@echo "Starting services with Docker Compose..."
+	docker-compose up -d
+
+# Stop Docker Compose services
+.PHONY: docker-down
+docker-down:
+	@echo "Stopping Docker Compose services..."
+	docker-compose down
+
 # Show help
 .PHONY: help
 help:
@@ -108,8 +136,13 @@ help:
 	@echo "  lint           - Run linter"
 	@echo "  fmt            - Format code"
 	@echo "  vet            - Vet code"
+	@echo "  security       - Run security scan"
+	@echo "  check          - Run all checks (lint, test, security)"
 	@echo "  deps           - Download dependencies"
 	@echo "  dev            - Start development environment"
 	@echo "  dev-stop       - Stop development environment"
+	@echo "  docker-build   - Build Docker image"
+	@echo "  docker-up      - Start services with Docker Compose"
+	@echo "  docker-down    - Stop Docker Compose services"
 	@echo "  install-tools  - Install development tools"
 	@echo "  help           - Show this help message"

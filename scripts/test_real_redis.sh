@@ -30,6 +30,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -58,11 +59,12 @@ func main() {
 			TicketID: fmt.Sprintf("ticket-%d", i),
 		}
 
-		task, err := payload.ToTask()
+		payloadBytes, err := json.Marshal(payload)
 		if err != nil {
-			log.Printf("Failed to create task %d: %v", i, err)
+			log.Printf("Failed to marshal payload %d: %v", i, err)
 			continue
 		}
+		task := asynq.NewTask("order_created", payloadBytes)
 
 		info, err := client.EnqueueContext(context.Background(), task)
 		if err != nil {

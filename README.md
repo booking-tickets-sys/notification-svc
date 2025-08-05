@@ -2,6 +2,27 @@
 
 A high-performance notification service built with Go that processes order events using Redis and Asynq for reliable async job processing. The service is designed to handle order creation events and send appropriate notifications to users.
 
+[![CI](https://github.com/your-org/notification-svc/workflows/CI/badge.svg)](https://github.com/your-org/notification-svc/actions)
+[![Go Report Card](https://goreportcard.com/badge/github.com/your-org/notification-svc)](https://goreportcard.com/report/github.com/your-org/notification-svc)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/your-org/notification-svc)](https://go.dev/)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+## Table of Contents
+
+- [Features](#features)
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+- [Usage](#usage)
+- [API Reference](#api-reference)
+- [Development](#development)
+- [CI/CD Pipeline](#cicd-pipeline)
+- [Monitoring and Observability](#monitoring-and-observability)
+- [Production Considerations](#production-considerations)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
+
 ## Features
 
 - **Event-Driven Architecture**: Processes order creation events from Redis streams
@@ -15,10 +36,27 @@ A high-performance notification service built with Go that processes order event
 
 ## Prerequisites
 
-- Go 1.24.4 or later
+- Go 1.22 or later
 - Redis server running locally or remotely
+- Docker (optional, for containerized deployment)
 
-## Installation
+## Quick Start
+
+### Using Docker Compose (Recommended)
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd notification-svc
+
+# Start the service with Redis
+docker-compose up -d
+
+# Check logs
+docker-compose logs -f notification-svc
+```
+
+### Manual Installation
 
 1. Clone the repository:
 ```bash
@@ -39,6 +77,11 @@ docker run -d -p 6379:6379 redis:alpine
 # Or using Homebrew (macOS)
 brew install redis
 brew services start redis
+```
+
+4. Run the service:
+```bash
+go run cmd/notification-svc/main.go
 ```
 
 ## Configuration
@@ -102,7 +145,9 @@ export WORKERS_COUNT=10
 2. Configuration file (`configs/config.yaml`)
 3. Default values (lowest priority)
 
-## Running the Service
+## Usage
+
+### Running the Service
 
 ### Using Make
 
@@ -375,14 +420,116 @@ redis-cli ping
 # Use the IsRunning() method on the worker instance
 ```
 
+## Development
+
+### Prerequisites
+
+- Go 1.22 or later
+- Docker and Docker Compose
+- Make (optional, for convenience commands)
+
+### Setup Development Environment
+
+```bash
+# Install development tools
+make install-tools
+
+# Install dependencies
+go mod tidy
+
+# Start development environment
+make dev
+```
+
+### Available Commands
+
+```bash
+# Code quality
+make lint          # Run linter
+make fmt           # Format code
+make vet           # Vet code
+make security      # Security scan
+
+# Testing
+make test          # Run tests
+make test-coverage # Run tests with coverage
+
+# Building
+make build         # Build binary
+make run           # Build and run
+make clean         # Clean build artifacts
+
+# Docker
+make docker-build  # Build Docker image
+make docker-up     # Start with Docker Compose
+make docker-down   # Stop Docker Compose
+
+# Development
+make dev           # Start development environment
+make dev-stop      # Stop development environment
+make check         # Run all checks (lint, test, security)
+```
+
+## CI/CD Pipeline
+
+This project includes a comprehensive CI/CD pipeline using GitHub Actions:
+
+### Continuous Integration
+
+The CI pipeline runs on every push and pull request and includes:
+
+- **Code Quality Checks**: Linting with golangci-lint
+- **Security Scanning**: Security analysis with gosec
+- **Unit Testing**: Comprehensive test suite with coverage reporting
+- **Integration Testing**: End-to-end tests with Redis
+- **Build Verification**: Ensures the application builds successfully
+
+### Pipeline Stages
+
+1. **Test Stage**: Runs linting, unit tests, and builds the application
+2. **Security Stage**: Performs security scanning and vulnerability analysis
+3. **Integration Test Stage**: Runs integration tests with Redis service
+4. **Build Stage**: Creates Docker image (only on main branch)
+
+### Local Development
+
+Run the same checks locally:
+
+```bash
+# Run all checks (lint, test, security)
+make check
+
+# Run specific checks
+make lint
+make test
+make security
+
+# Build and run with Docker
+make docker-build
+make docker-up
+```
+
+### Code Quality
+
+The project uses golangci-lint with a comprehensive configuration:
+
+```bash
+# Install linting tools
+make install-tools
+
+# Run linter
+make lint
+```
+
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
 4. Add tests for new functionality
-5. Ensure all tests pass
-6. Submit a pull request
+5. Run the full test suite: `make check`
+6. Ensure all CI checks pass
+7. Submit a pull request
 
 ## License
 

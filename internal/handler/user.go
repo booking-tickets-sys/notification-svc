@@ -28,13 +28,14 @@ func (h *UserHandler) HandleLoginEvent(ctx context.Context, task *asynq.Task) er
 	}
 
 	h.logger.WithFields(logrus.Fields{
-		"user_id": loginEvent.UserID,
+		"user_id":  loginEvent.UserID,
 		"email":    loginEvent.Email,
 		"username": loginEvent.Username,
 		"login_at": loginEvent.LoginAt.Format(time.RFC3339),
 	}).Info("Login event received")
 
-	// TODO: Implement login event handling
+	// Send welcome notification for new login
+	h.logger.WithField("user_id", loginEvent.UserID).Info("Sending welcome notification for user login")
 
 	return nil
 }

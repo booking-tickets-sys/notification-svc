@@ -10,6 +10,5 @@ type EventType string
 
 const (
 	OrderCreatedEventType EventType = "order_created"
-	OrderCreatedFailedEventType EventType = "order_created_failed"
 	LoginEventType EventType = "login"
 )

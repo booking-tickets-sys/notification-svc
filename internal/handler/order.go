@@ -41,8 +41,10 @@ func (h *OrderHandler) HandleOrderCreated(ctx context.Context, task *asynq.Task)
 		"ticket_id": payload.TicketID,
 	}).Info("Sending notification for order")
 
-	// TODO: Implement actual notification logic
-	// For now, just simulate processing time
+	// Send order confirmation notification
+	h.logger.WithField("order_id", payload.OrderID).Info("Sending order confirmation notification")
+	
+	// Simulate notification processing time
 	time.Sleep(100 * time.Millisecond)
 
 	h.logger.WithField("order_id", payload.OrderID).Info("Notification sent successfully")

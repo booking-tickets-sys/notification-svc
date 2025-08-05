@@ -1,392 +1,389 @@
 # Notification Service
 
-A high-performance, asynchronous notification service built with Go, Redis, and Asynq. This service provides a scalable solution for sending various types of notifications (email, SMS, push, webhook) through a distributed task queue system.
+A high-performance notification service built with Go that processes order events using Redis and Asynq for reliable async job processing. The service is designed to handle order creation events and send appropriate notifications to users.
 
 ## Features
 
-- **Asynchronous Processing**: Uses Redis and Asynq for reliable, distributed task processing
-- **Multiple Notification Types**: Support for email, SMS, push notifications, and webhooks
-- **Priority Queues**: Different priority levels (critical, default, low) for task processing
-- **RESTful API**: Clean HTTP API for enqueueing notifications
-- **Scalable Architecture**: Separate server and worker processes for horizontal scaling
-- **Docker Support**: Complete containerization with docker-compose
-- **Monitoring**: Optional Asynqmon integration for queue monitoring
-
-## Architecture
-
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   HTTP Server   │───▶│   Redis Queue   │───▶│   Worker(s)     │
-│   (API)         │    │   (Asynq)       │    │   (Processors)  │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
+- **Event-Driven Architecture**: Processes order creation events from Redis streams
+- **Async Job Processing**: Uses Asynq for reliable Redis-based job queue processing
+- **Worker Pool**: Configurable number of concurrent workers for processing notifications
+- **Order Event Handling**: Specialized handling for order creation events
+- **Graceful Shutdown**: Proper cleanup and shutdown handling with context cancellation
+- **Configuration Management**: Uses Viper for flexible configuration (files, environment variables)
+- **Structured Logging**: Uses Logrus for structured JSON logging with contextual fields
+- **Health Monitoring**: Built-in health monitoring and worker status tracking
 
 ## Prerequisites
 
-- Go 1.24 or higher
-- Redis 4.0 or higher
-- Docker and Docker Compose (optional)
+- Go 1.24.4 or later
+- Redis server running locally or remotely
 
-## Quick Start
+## Installation
 
-### Using Docker Compose (Recommended)
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd notification-svc
-   ```
-
-2. **Start the services**
-   ```bash
-   docker-compose up -d
-   ```
-
-3. **Test the service**
-   ```bash
-   # Send an email notification
-   curl -X POST http://localhost:8080/api/v1/notifications/email \
-     -H "Content-Type: application/json" \
-     -d '{
-       "to": "user@example.com",
-       "subject": "Welcome!",
-       "body": "Welcome to our service!",
-       "priority": "high",
-       "user_id": "123"
-     }'
-   ```
-
-### Manual Setup
-
-1. **Install dependencies**
-   ```bash
-   go mod download
-   ```
-
-2. **Start Redis**
-   ```bash
-   # Using Docker
-   docker run -d -p 6379:6379 redis:7-alpine
-   
-   # Or install Redis locally
-   # brew install redis (macOS)
-   # sudo apt-get install redis-server (Ubuntu)
-   ```
-
-3. **Configure the service**
-   ```bash
-   cp config.env.example config.env
-   # Edit config.env with your settings
-   ```
-
-4. **Build and run**
-   ```bash
-   # Build both server and worker
-   make build
-   
-   # Run server (in one terminal)
-   make run-server
-   
-   # Run worker (in another terminal)
-   make run-worker
-   ```
-
-## API Endpoints
-
-### Health Check
-```
-GET /health
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd notification-svc
 ```
 
-### Email Notifications
-```
-POST /api/v1/notifications/email
-Content-Type: application/json
-
-{
-  "to": "user@example.com",
-  "subject": "Welcome!",
-  "body": "Welcome to our service!",
-  "templateId": "welcome_template",
-  "data": {"name": "John"},
-  "priority": "high",
-  "userId": "123"
-}
+2. Install dependencies:
+```bash
+go mod tidy
 ```
 
-### SMS Notifications
-```
-POST /api/v1/notifications/sms
-Content-Type: application/json
+3. Start Redis server (if not already running):
+```bash
+# Using Docker
+docker run -d -p 6379:6379 redis:alpine
 
-{
-  "to": "+1234567890",
-  "message": "Your verification code is 123456",
-  "priority": "high",
-  "userId": "123"
-}
-```
-
-### Push Notifications
-```
-POST /api/v1/notifications/push
-Content-Type: application/json
-
-{
-  "deviceToken": "fcm_token_here",
-  "title": "New Message",
-  "body": "You have a new message",
-  "data": {"messageId": "456"},
-  "priority": "default",
-  "userId": "123"
-}
-```
-
-### Webhook Notifications
-```
-POST /api/v1/notifications/webhook
-Content-Type: application/json
-
-{
-  "url": "https://api.example.com/webhook",
-  "method": "POST",
-  "headers": {"Authorization": "Bearer token"},
-  "body": {"event": "user_registered"},
-  "priority": "low",
-  "userId": "123"
-}
-```
-
-### Bulk Notifications
-```
-POST /api/v1/notifications/bulk
-Content-Type: application/json
-
-{
-  "type": "email",
-  "recipients": ["user1@example.com", "user2@example.com"],
-  "subject": "Bulk Notification",
-  "message": "This is a bulk notification",
-  "priority": "default",
-  "userId": "123"
-}
+# Or using Homebrew (macOS)
+brew install redis
+brew services start redis
 ```
 
 ## Configuration
 
-The service can be configured using environment variables or the `config.env` file:
+The service uses Viper for configuration management, supporting multiple configuration sources:
 
-```env
-# Redis Configuration
-REDIS_ADDR=localhost:6379
-REDIS_PASSWORD=
-REDIS_DB=0
+### Configuration File
 
-# Server Configuration
-SERVER_PORT=8080
-SERVER_HOST=localhost
+The service looks for configuration in the `configs` directory. Create a `configs/config.yaml` file:
 
-# Asynq Configuration
-ASYNQ_CONCURRENCY=10
-ASYNQ_QUEUE_CRITICAL=6
-ASYNQ_QUEUE_DEFAULT=3
-ASYNQ_QUEUE_LOW=1
+```yaml
+# Notification Service Configuration
 
-# Notification Configuration
-EMAIL_SMTP_HOST=smtp.gmail.com
-EMAIL_SMTP_PORT=587
-EMAIL_FROM=noreply@example.com
-EMAIL_PASSWORD=your-email-password
+server:
+  port: "8080"
+  host: "0.0.0.0"
+  read_timeout: 30
+  write_timeout: 30
+  idle_timeout: 60
 
-# Logging
-LOG_LEVEL=info
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+  pool_size: 10
+
+queue:
+  name: "notifications"
+
+logging:
+  level: "info"  # debug, info, warn, error, fatal, panic
+  format: "json" # json, text
+  output: "stdout"
+
+workers:
+  count: 5
 ```
 
-## Queue Priorities
+### Environment Variables
 
-The service uses three priority queues:
-
-- **Critical** (6 workers): High-priority notifications
-- **Default** (3 workers): Standard notifications
-- **Low** (1 worker): Low-priority notifications
-
-## Monitoring
-
-### Using Asynqmon
-
-Asynqmon provides a web-based dashboard for monitoring queues and tasks:
-
-1. **Enable in docker-compose.yml**
-   ```yaml
-   asynqmon:
-     image: hibiken/asynqmon:latest
-     ports:
-       - "8081:8080"
-     environment:
-       - REDIS_ADDR=redis:6379
-   ```
-
-2. **Access the dashboard**
-   ```
-   http://localhost:8081
-   ```
-
-### Using Asynq CLI
-
-Install the Asynq CLI tool for command-line monitoring:
+You can override any configuration using environment variables:
 
 ```bash
-make install-asynq-cli
+# Redis configuration
+export REDIS_ADDR=redis.example.com:6379
+export REDIS_PASSWORD=your_password
+export REDIS_DB=1
+export REDIS_POOL_SIZE=20
 
-# View queue statistics
-asynq stats --redis-addr=localhost:6379
+# Logging configuration
+export LOGGING_LEVEL=debug
+export LOGGING_FORMAT=text
 
-# View tasks in a queue
-asynq queue --redis-addr=localhost:6379 default
-
-# View task details
-asynq task --redis-addr=localhost:6379 <task-id>
+# Worker configuration
+export WORKERS_COUNT=10
 ```
 
-## Development
+### Configuration Priority
 
-### Project Structure
+1. Environment variables (highest priority)
+2. Configuration file (`configs/config.yaml`)
+3. Default values (lowest priority)
+
+## Running the Service
+
+### Using Make
+
+```bash
+# Build and run
+make run
+
+# Development mode (starts Redis automatically)
+make dev
+
+# Stop development environment
+make dev-stop
+
+# See all available commands
+make help
+```
+
+### Direct Execution
+
+```bash
+# Run with default configuration
+go run cmd/notification-svc/main.go
+
+# Run with custom config directory
+CONFIG_DIR=/path/to/configs go run cmd/notification-svc/main.go
+```
+
+## Architecture
+
+### Event Processing Flow
+
+1. **Event Reception**: The service listens for order creation events from Redis streams
+2. **Job Enqueuing**: Events are converted to Asynq tasks and enqueued in Redis
+3. **Worker Processing**: Multiple workers process tasks concurrently
+4. **Notification Sending**: Based on the event type, appropriate notifications are sent
+5. **Error Handling**: Failed tasks are retried with exponential backoff
+
+### Supported Events
+
+#### Order Created Event
+
+**Event Name**: `order_created`
+
+**Payload Structure**:
+```json
+{
+  "eventMetadata": {
+    "eventID": "evt_123456789",
+    "eventName": "order_created",
+    "publishedAt": 1642234567890
+  },
+  "orderId": "ord_123456789",
+  "userId": "user_123456789",
+  "ticketId": "tkt_123456789"
+}
+```
+
+**Processing**: When an order is created, the service sends confirmation notifications to the user.
+
+## Project Structure
 
 ```
 notification-svc/
 ├── cmd/
-│   ├── server/          # HTTP server entry point
-│   └── worker/          # Worker entry point
+│   └── notification-svc/
+│       └── main.go              # Main application entry point
 ├── internal/
-│   ├── client/          # Asynq client
-│   ├── config/          # Configuration management
-│   ├── handlers/        # HTTP request handlers
-│   ├── server/          # HTTP server
-│   ├── tasks/           # Task definitions and handlers
-│   └── worker/          # Worker server
-├── config.env           # Configuration file
-├── docker-compose.yml   # Docker services
-├── Dockerfile           # Container definition
-├── go.mod              # Go modules
-├── Makefile            # Build and run commands
-└── README.md           # This file
+│   ├── config/
+│   │   └── config.go            # Configuration management with Viper
+│   ├── logger/
+│   │   └── logger.go            # Structured logging with Logrus
+│   ├── handler/
+│   │   └── order.go             # Order event handlers
+│   ├── worker/
+│   │   ├── notification.go      # Notification worker implementation
+│   │   └── notification_test.go # Worker tests
+│   └── models/
+│       └── events/
+│           ├── events.go        # Event metadata structures
+│           └── order.go         # Order-related event payloads
+├── pkg/
+│   └── events/                  # Public event packages
+├── configs/
+│   ├── config.yaml              # Sample configuration file
+│   └── env.example              # Environment variables example
+├── scripts/                     # Build and utility scripts
+├── docs/                        # Documentation
+├── go.mod                       # Go module dependencies
+├── go.sum                       # Dependency checksums
+├── Makefile                     # Build and development commands
+└── README.md                    # Documentation
 ```
 
-### Building
+## Development
+
+### Testing
 
 ```bash
-# Build both binaries
+# Run all tests
+make test
+
+# Run tests with coverage
+make test-coverage
+
+# Run specific test
+go test -v -run TestNotificationWorker
+```
+
+### Code Quality
+
+```bash
+# Format code
+make fmt
+
+# Lint code
+make lint
+
+# Vet code
+make vet
+```
+
+### Building and Development
+
+```bash
+# Build binary
 make build
 
-# Build server only
-make build-server
+# Install dependencies
+make deps
 
-# Build worker only
-make build-worker
+# Install development tools
+make install-tools
 ```
 
-### Running
+### Code Quality
 
 ```bash
-# Run both server and worker (requires tmux)
-make run
+# Format code
+make fmt
 
-# Run server only
-make run-server
+# Lint code
+make lint
 
-# Run worker only
-make run-worker
+# Vet code
+make vet
 ```
 
 ### Testing
 
 ```bash
-# Run tests
+# Run all tests
 make test
+
+# Run tests with coverage
+make test-coverage
 ```
 
-## Scaling
+## Available Make Commands
 
-### Horizontal Scaling
+The project includes a comprehensive Makefile with the following commands:
 
-The service is designed for horizontal scaling:
+### Core Commands
+- `make build` - Build the application
+- `make run` - Build and run the application
+- `make clean` - Clean build artifacts
 
-1. **Multiple Workers**: Run multiple worker instances to process more tasks
-2. **Load Balancing**: Use a load balancer in front of multiple server instances
-3. **Redis Cluster**: Use Redis Cluster for high availability
+### Development Commands
+- `make dev` - Start development environment (Redis + service)
+- `make dev-stop` - Stop development environment
+- `make deps` - Download and tidy dependencies
 
-### Example: Multiple Workers
+### Testing Commands
+- `make test` - Run all tests
+- `make test-coverage` - Run tests with coverage report
 
-```bash
-# Start multiple worker instances
-make run-worker  # Terminal 1
-make run-worker  # Terminal 2
-make run-worker  # Terminal 3
+### Code Quality Commands
+- `make fmt` - Format code
+- `make lint` - Run linter
+- `make vet` - Vet code
+- `make install-tools` - Install development tools
+
+### Help
+- `make help` - Show all available commands
+
+## Monitoring and Observability
+
+### Logging
+
+The service uses Logrus for structured logging with the following features:
+
+#### Log Levels
+
+- `debug`: Detailed debug information
+- `info`: General information about application flow
+- `warn`: Warning messages for potentially harmful situations
+- `error`: Error messages for error conditions
+- `fatal`: Fatal errors that cause the application to exit
+- `panic`: Panic messages
+
+#### Log Formats
+
+- `json`: Structured JSON logging (default)
+- `text`: Human-readable text format
+
+#### Structured Fields
+
+The logger automatically adds contextual fields:
+
+```json
+{
+  "level": "info",
+  "msg": "Processing order created event",
+  "worker_id": 1,
+  "order_id": "ord_123456789",
+  "user_id": "user_123456789",
+  "time": "2024-01-15T10:30:00Z"
+}
 ```
 
-## Production Deployment
+### Worker Status
 
-### Environment Variables
+The service provides methods to check worker status:
 
-Set appropriate environment variables for production:
-
-```bash
-export REDIS_ADDR=your-redis-cluster:6379
-export REDIS_PASSWORD=your-redis-password
-export ASYNQ_CONCURRENCY=50
-export LOG_LEVEL=warn
+```go
+// Check if worker is running
+isRunning := notificationWorker.IsRunning()
 ```
 
-### Security Considerations
+## Production Considerations
 
-1. **Redis Security**: Use Redis ACLs and strong passwords
-2. **API Security**: Implement authentication and rate limiting
-3. **Network Security**: Use TLS for all communications
-4. **Container Security**: Run containers as non-root users
-
-### Monitoring and Logging
-
-1. **Application Metrics**: Implement Prometheus metrics
-2. **Logging**: Use structured logging with correlation IDs
-3. **Health Checks**: Implement comprehensive health checks
-4. **Alerting**: Set up alerts for queue backlogs and failures
+1. **Redis Configuration**: Use Redis Cluster or Redis Sentinel for high availability
+2. **Monitoring**: Add metrics collection (Prometheus, etc.)
+3. **Logging**: Configure log aggregation (ELK stack, etc.)
+4. **Error Handling**: Add retry mechanisms and dead letter queues
+5. **Scaling**: Run multiple instances behind a load balancer
+6. **Configuration**: Use environment variables for sensitive configuration
+7. **Health Checks**: Implement comprehensive health checks
+8. **Security**: Follow security best practices for production deployments
+9. **Graceful Shutdown**: Ensure proper cleanup of resources
+10. **Circuit Breakers**: Implement circuit breakers for external service calls
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Redis Connection Failed**
-   - Check Redis is running: `redis-cli ping`
-   - Verify connection settings in config.env
+1. **Redis Connection Error**: Ensure Redis is running and accessible
+2. **Worker Not Processing**: Check worker logs and Redis connection
+3. **Configuration Not Loading**: Verify config directory path and format
+4. **Graceful Shutdown Issues**: Check for proper context cancellation
 
-2. **Tasks Not Processing**
-   - Ensure worker is running: `make run-worker`
-   - Check Redis connection from worker
-   - Verify task handlers are registered
+### Logs
 
-3. **High Memory Usage**
-   - Adjust `ASYNQ_CONCURRENCY` setting
-   - Monitor Redis memory usage
-   - Implement task cleanup
+The service provides detailed structured logging for debugging:
 
-### Debug Mode
+```bash
+# View logs in JSON format
+go run cmd/notification-svc/main.go | jq '.'
 
-Enable debug logging by setting `LOG_LEVEL=debug` in your configuration.
+# View logs in text format
+LOGGING_FORMAT=text go run cmd/notification-svc/main.go
+```
+
+### Health Checks
+
+```bash
+# Check Redis connection
+redis-cli ping
+
+# Check worker status (programmatically)
+# Use the IsRunning() method on the worker instance
+```
 
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests
-5. Submit a pull request
+4. Add tests for new functionality
+5. Ensure all tests pass
+6. Submit a pull request
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## References
-
-- [Asynq Documentation](https://github.com/hibiken/asynq)
-- [Redis Documentation](https://redis.io/documentation)
-- [Gin Framework](https://gin-gonic.com/) 
+[Add your license here] 

@@ -1,93 +1,113 @@
 package config
 
 import (
-	"os"
-	"strconv"
+	"fmt"
+	"strings"
 
-	"github.com/joho/godotenv"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
+// Config holds all configuration for the application
 type Config struct {
-	Redis  RedisConfig
-	Server ServerConfig
-	Asynq  AsynqConfig
-	Email  EmailConfig
-	Log    LogConfig
+	Redis   RedisConfig   `mapstructure:"redis"`
+	Logging LoggingConfig `mapstructure:"logging"`
+	Workers WorkersConfig `mapstructure:"workers"`
 }
 
+// RedisConfig holds Redis configuration
 type RedisConfig struct {
-	Addr     string
-	Password string
-	DB       int
+	Addr     string `mapstructure:"addr"`
+	Password string `mapstructure:"password"`
+	DB       int    `mapstructure:"db"`
+	PoolSize int    `mapstructure:"pool_size"`
 }
 
-type ServerConfig struct {
-	Port string
-	Host string
+// LoggingConfig holds logging configuration
+type LoggingConfig struct {
+	Level  string `mapstructure:"level"`
+	Format string `mapstructure:"format"`
+	Output string `mapstructure:"output"`
 }
 
-type AsynqConfig struct {
-	Concurrency int
-	Queues      map[string]int
+// WorkersConfig holds worker pool configuration
+type WorkersConfig struct {
+	Count int `mapstructure:"count"`
 }
 
-type EmailConfig struct {
-	SMTPHost string
-	SMTPPort int
-	From     string
-	Password string
-}
+// LoadConfig reads configuration from file or environment variables
+func LoadConfig(path string) (*Config, error) {
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(path)
+	viper.AddConfigPath(".")
+	viper.AddConfigPath("./configs")
+	viper.AddConfigPath("../configs")
 
-type LogConfig struct {
-	Level string
-}
+	// Set default values
+	setDefaults()
 
-func Load() (*Config, error) {
-	// Load .env file if it exists
-	godotenv.Load("config.env")
+	// Read environment variables
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	concurrency, _ := strconv.Atoi(getEnv("ASYNQ_CONCURRENCY", "10"))
-	critical, _ := strconv.Atoi(getEnv("ASYNQ_QUEUE_CRITICAL", "6"))
-	defaultQueue, _ := strconv.Atoi(getEnv("ASYNQ_QUEUE_DEFAULT", "3"))
-	low, _ := strconv.Atoi(getEnv("ASYNQ_QUEUE_LOW", "1"))
-	smtpPort, _ := strconv.Atoi(getEnv("EMAIL_SMTP_PORT", "587"))
-	redisDB, _ := strconv.Atoi(getEnv("REDIS_DB", "0"))
-
-	config := &Config{
-		Redis: RedisConfig{
-			Addr:     getEnv("REDIS_ADDR", "localhost:6379"),
-			Password: getEnv("REDIS_PASSWORD", ""),
-			DB:       redisDB,
-		},
-		Server: ServerConfig{
-			Port: getEnv("SERVER_PORT", "8080"),
-			Host: getEnv("SERVER_HOST", "localhost"),
-		},
-		Asynq: AsynqConfig{
-			Concurrency: concurrency,
-			Queues: map[string]int{
-				"critical": critical,
-				"default":  defaultQueue,
-				"low":      low,
-			},
-		},
-		Email: EmailConfig{
-			SMTPHost: getEnv("EMAIL_SMTP_HOST", "smtp.gmail.com"),
-			SMTPPort: smtpPort,
-			From:     getEnv("EMAIL_FROM", "noreply@example.com"),
-			Password: getEnv("EMAIL_PASSWORD", ""),
-		},
-		Log: LogConfig{
-			Level: getEnv("LOG_LEVEL", "info"),
-		},
+	// Read config file if it exists
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return nil, fmt.Errorf("error reading config file: %w", err)
+		}
+		// Config file not found, but that's okay - we'll use defaults and env vars
 	}
 
-	return config, nil
+	var config Config
+	if err := viper.Unmarshal(&config); err != nil {
+		return nil, fmt.Errorf("error unmarshaling config: %w", err)
+	}
+
+	return &config, nil
 }
 
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
+// setDefaults sets default configuration values
+func setDefaults() {
+	// Redis defaults
+	viper.SetDefault("redis.addr", "localhost:6379")
+	viper.SetDefault("redis.password", "")
+	viper.SetDefault("redis.db", 0)
+	viper.SetDefault("redis.pool_size", 10)
+
+	// Logging defaults
+	viper.SetDefault("logging.level", "info")
+	viper.SetDefault("logging.format", "json")
+	viper.SetDefault("logging.output", "stdout")
+
+	// Workers defaults
+	viper.SetDefault("workers.count", 5)
+}
+
+// SetupLogging configures the logger based on configuration
+func SetupLogging(config *LoggingConfig) {
+	// Set log level
+	level, err := logrus.ParseLevel(config.Level)
+	if err != nil {
+		logrus.Warnf("Invalid log level %s, using info", config.Level)
+		level = logrus.InfoLevel
 	}
-	return defaultValue
+	logrus.SetLevel(level)
+
+	// Set log format
+	switch strings.ToLower(config.Format) {
+	case "json":
+		logrus.SetFormatter(&logrus.JSONFormatter{})
+	case "text":
+		logrus.SetFormatter(&logrus.TextFormatter{
+			FullTimestamp: true,
+		})
+	default:
+		logrus.SetFormatter(&logrus.JSONFormatter{})
+	}
+
+	// Set output (for now, we only support stdout)
+	if config.Output != "stdout" {
+		logrus.Warnf("Output %s not supported, using stdout", config.Output)
+	}
 }

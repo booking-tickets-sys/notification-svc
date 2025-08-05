@@ -1,91 +1,115 @@
-.PHONY: build build-server build-worker run-server run-worker test clean docker-build docker-run
+# Makefile for notification-svc
 
-# Build variables
-BINARY_SERVER=notification-server
-BINARY_WORKER=notification-worker
-BUILD_DIR=build
+# Variables
+BINARY_NAME=notification-svc
+BUILD_DIR=bin
+MAIN_PATH=cmd/notification-svc
+CONFIG_DIR=configs
 
-# Build the server binary
-build-server:
-	@echo "Building notification server..."
+# Go parameters
+GOCMD=go
+GOBUILD=$(GOCMD) build
+GOCLEAN=$(GOCMD) clean
+GOTEST=$(GOCMD) test
+GOGET=$(GOCMD) get
+GOMOD=$(GOCMD) mod
+
+# Build the application
+.PHONY: build
+build:
+	@echo "Building $(BINARY_NAME)..."
 	@mkdir -p $(BUILD_DIR)
-	go build -o $(BUILD_DIR)/$(BINARY_SERVER) ./cmd/server
+	$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_NAME) ./$(MAIN_PATH)
 
-# Build the worker binary
-build-worker:
-	@echo "Building notification worker..."
-	@mkdir -p $(BUILD_DIR)
-	go build -o $(BUILD_DIR)/$(BINARY_WORKER) ./cmd/worker
-
-# Build both binaries
-build: build-server build-worker
-
-# Run the server
-run-server: build-server
-	@echo "Starting notification server..."
-	./$(BUILD_DIR)/$(BINARY_SERVER)
-
-# Run the worker
-run-worker: build-worker
-	@echo "Starting notification worker..."
-	./$(BUILD_DIR)/$(BINARY_WORKER)
-
-# Run both server and worker (requires tmux)
+# Run the application
+.PHONY: run
 run: build
-	@echo "Starting notification service (server + worker)..."
-	@if command -v tmux >/dev/null 2>&1; then \
-		tmux new-session -d -s notification-svc './$(BUILD_DIR)/$(BINARY_SERVER)' \; \
-		split-window -h './$(BUILD_DIR)/$(BINARY_WORKER)' \; \
-		attach-session -d notification-svc; \
-	else \
-		echo "tmux not found. Please install tmux or run server and worker separately."; \
-		echo "Run 'make run-server' in one terminal and 'make run-worker' in another."; \
-	fi
-
-# Run tests
-test:
-	@echo "Running tests..."
-	go test -v ./...
+	@echo "Running $(BINARY_NAME)..."
+	./$(BUILD_DIR)/$(BINARY_NAME)
 
 # Clean build artifacts
+.PHONY: clean
 clean:
-	@echo "Cleaning build artifacts..."
+	@echo "Cleaning..."
+	$(GOCLEAN)
 	rm -rf $(BUILD_DIR)
 
-# Install dependencies
+# Run tests
+.PHONY: test
+test:
+	@echo "Running tests..."
+	$(GOTEST) -v ./...
+
+# Run tests with coverage
+.PHONY: test-coverage
+test-coverage:
+	@echo "Running tests with coverage..."
+	$(GOTEST) -v -coverprofile=coverage.out ./...
+	$(GOCMD) tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated: coverage.html"
+
+# Run linting
+.PHONY: lint
+lint:
+	@echo "Running linter..."
+	golangci-lint run
+
+# Format code
+.PHONY: fmt
+fmt:
+	@echo "Formatting code..."
+	$(GOCMD) fmt ./...
+
+# Vet code
+.PHONY: vet
+vet:
+	@echo "Vetting code..."
+	$(GOCMD) vet ./...
+
+# Download dependencies
+.PHONY: deps
 deps:
-	@echo "Installing dependencies..."
-	go mod download
-	go mod tidy
+	@echo "Downloading dependencies..."
+	$(GOMOD) download
+	$(GOMOD) tidy
 
-# Docker build
-docker-build:
-	@echo "Building Docker image..."
-	docker build -t notification-svc .
+# Development mode (starts Redis and runs the service)
+.PHONY: dev
+dev:
+	@echo "Starting development environment..."
+	@echo "Starting Redis..."
+	@docker run -d --name redis-dev -p 6379:6379 redis:alpine || echo "Redis container already running"
+	@echo "Starting notification service..."
+	@$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_NAME) ./$(MAIN_PATH)
+	@./$(BUILD_DIR)/$(BINARY_NAME)
 
-# Docker run
-docker-run:
-	@echo "Running Docker container..."
-	docker run -p 8080:8080 --env-file config.env notification-svc
+# Stop development environment
+.PHONY: dev-stop
+dev-stop:
+	@echo "Stopping development environment..."
+	@docker stop redis-dev || echo "Redis container not running"
+	@docker rm redis-dev || echo "Redis container not found"
 
-# Install Asynq CLI tool
-install-asynq-cli:
-	@echo "Installing Asynq CLI tool..."
-	go install github.com/hibiken/asynq/tools/asynq@latest
+# Install development tools
+.PHONY: install-tools
+install-tools:
+	@echo "Installing development tools..."
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
-# Help
+# Show help
+.PHONY: help
 help:
 	@echo "Available commands:"
-	@echo "  build          - Build both server and worker binaries"
-	@echo "  build-server   - Build server binary only"
-	@echo "  build-worker   - Build worker binary only"
-	@echo "  run-server     - Run the notification server"
-	@echo "  run-worker     - Run the notification worker"
-	@echo "  run            - Run both server and worker (requires tmux)"
-	@echo "  test           - Run tests"
+	@echo "  build          - Build the application"
+	@echo "  run            - Build and run the application"
 	@echo "  clean          - Clean build artifacts"
-	@echo "  deps           - Install dependencies"
-	@echo "  docker-build   - Build Docker image"
-	@echo "  docker-run     - Run Docker container"
-	@echo "  install-asynq-cli - Install Asynq CLI tool"
-	@echo "  help           - Show this help message" 
+	@echo "  test           - Run tests"
+	@echo "  test-coverage  - Run tests with coverage report"
+	@echo "  lint           - Run linter"
+	@echo "  fmt            - Format code"
+	@echo "  vet            - Vet code"
+	@echo "  deps           - Download dependencies"
+	@echo "  dev            - Start development environment"
+	@echo "  dev-stop       - Stop development environment"
+	@echo "  install-tools  - Install development tools"
+	@echo "  help           - Show this help message"

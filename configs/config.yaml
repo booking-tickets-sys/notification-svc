@@ -1,0 +1,25 @@
+# Notification Service Configuration
+
+server:
+  port: "8080"
+  host: "0.0.0.0"
+  read_timeout: 30
+  write_timeout: 30
+  idle_timeout: 60
+
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+  pool_size: 10
+
+queue:
+  name: "notifications"
+
+logging:
+  level: "info"  # debug, info, warn, error, fatal, panic
+  format: "json" # json, text
+  output: "stdout"
+
+workers:
+  count: 5 
